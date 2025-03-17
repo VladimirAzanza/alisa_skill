@@ -21,10 +21,26 @@ func TestWebhook(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
-		{method: http.MethodGet, expectedCode: http.StatusMethodNotAllowed, expectedBody: ""},
-		{method: http.MethodPut, expectedCode: http.StatusMethodNotAllowed, expectedBody: ""},
-		{method: http.MethodDelete, expectedCode: http.StatusMethodNotAllowed, expectedBody: ""},
-		{method: http.MethodPost, expectedCode: http.StatusOK, expectedBody: successBody},
+		{
+			method:       http.MethodGet,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			method:       http.MethodPut,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			method:       http.MethodDelete,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			method:       http.MethodPost,
+			expectedCode: http.StatusOK,
+			expectedBody: successBody,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
@@ -32,7 +48,12 @@ func TestWebhook(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			webhook(w, r)
-			assert.Equal(t, tt.expectedCode, w.Code, "Status Code is not the expected")
+			assert.Equal(t, tt.expectedCode, w.Code, "Status Code is not the expected one")
+			if tt.expectedBody != "" {
+				assert.JSONEq(
+					t, tt.expectedBody, w.Body.String(), "JSON Body response is not the expected one",
+				)
+			}
 		})
 	}
 }
