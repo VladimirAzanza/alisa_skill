@@ -5,10 +5,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhook(t *testing.T) {
+	handler := http.HandlerFunc(webhook)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
 	successBody := `{
         "response": {
             "text": "Извините, я пока ничего не умею"
@@ -16,43 +21,30 @@ func TestWebhook(t *testing.T) {
         "version": "1.0"
     }`
 
-	tests := []struct {
+	testCases := []struct {
 		method       string
 		expectedCode int
 		expectedBody string
 	}{
-		{
-			method:       http.MethodGet,
-			expectedCode: http.StatusMethodNotAllowed,
-			expectedBody: "",
-		},
-		{
-			method:       http.MethodPut,
-			expectedCode: http.StatusMethodNotAllowed,
-			expectedBody: "",
-		},
-		{
-			method:       http.MethodDelete,
-			expectedCode: http.StatusMethodNotAllowed,
-			expectedBody: "",
-		},
-		{
-			method:       http.MethodPost,
-			expectedCode: http.StatusOK,
-			expectedBody: successBody,
-		},
+		{method: http.MethodGet, expectedCode: http.StatusMethodNotAllowed, expectedBody: ""},
+		{method: http.MethodPut, expectedCode: http.StatusMethodNotAllowed, expectedBody: ""},
+		{method: http.MethodDelete, expectedCode: http.StatusMethodNotAllowed, expectedBody: ""},
+		{method: http.MethodPost, expectedCode: http.StatusOK, expectedBody: successBody},
 	}
-	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
-			r := httptest.NewRequest(tt.method, "/", nil)
-			w := httptest.NewRecorder()
 
-			webhook(w, r)
-			assert.Equal(t, tt.expectedCode, w.Code, "Status Code is not the expected one")
-			if tt.expectedBody != "" {
-				assert.JSONEq(
-					t, tt.expectedBody, w.Body.String(), "JSON Body response is not the expected one",
-				)
+	for _, tc := range testCases {
+		t.Run(tc.method, func(t *testing.T) {
+			req := resty.New().R()
+			req.Method = tc.method
+			req.URL = srv.URL
+
+			resp, err := req.Send()
+			assert.NoError(t, err, "error making HTTP request")
+
+			assert.Equal(t, tc.expectedCode, resp.StatusCode(), "Response code didn't match expected")
+			// проверяем корректность полученного тела ответа, если мы его ожидаем
+			if tc.expectedBody != "" {
+				assert.JSONEq(t, tc.expectedBody, string(resp.Body()))
 			}
 		})
 	}
