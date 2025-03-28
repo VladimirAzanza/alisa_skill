@@ -7,6 +7,8 @@ import (
 
 // go build -o skill
 // ./skill -a :8081
+// RUN_ADDR=:8081 ./skill
+// RUN_ADDR=:8082 ./skill -a :8081
 func main() {
 	parseFlags()
 
