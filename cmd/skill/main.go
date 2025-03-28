@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+// go build -o skill
+// ./skill -a :8081
 func main() {
 	parseFlags()
 
