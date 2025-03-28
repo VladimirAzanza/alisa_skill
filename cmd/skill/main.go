@@ -6,6 +6,8 @@ import (
 )
 
 func main() {
+	parseFlags()
+
 	if err := run(); err != nil {
 		panic(err)
 	}
