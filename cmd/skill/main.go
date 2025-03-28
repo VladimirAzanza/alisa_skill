@@ -17,6 +17,8 @@ func run() error {
 	return http.ListenAndServe(`:8080`, http.HandlerFunc(webhook))
 }
 
+// to run this service:
+// curl -X POST http://localhost:8080 -H "Content-Type: application/json" -d '{}'
 func webhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
