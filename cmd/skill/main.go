@@ -3,6 +3,9 @@ package main
 
 import (
 	"net/http"
+
+	"github.com/VladimirAzanza/alisa_skill/internal/logger"
+	"go.uber.org/zap"
 )
 
 // go build -o skill
@@ -18,6 +21,11 @@ func main() {
 }
 
 func run() error {
+	if err := logger.Initialize(flagLogLevel); err != nil {
+		return err
+	}
+
+	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
 	return http.ListenAndServe(`:8080`, http.HandlerFunc(webhook))
 }
 
@@ -25,6 +33,7 @@ func run() error {
 // curl -X POST http://localhost:8080 -H "Content-Type: application/json" -d '{}'
 func webhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		logger.Log.Debug("got request with bad method", zap.String("method", r.Method))
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -38,4 +47,5 @@ func webhook(w http.ResponseWriter, r *http.Request) {
         "version": "1.0"
       }
     `))
+	logger.Log.Debug("sending HTTP 200 response")
 }

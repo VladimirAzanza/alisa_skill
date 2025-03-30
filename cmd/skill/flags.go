@@ -5,7 +5,10 @@ import (
 	"os"
 )
 
-var flagRunAddr string
+var (
+	flagRunAddr  string
+	flagLogLevel string
+)
 
 // parseFlags initializes and parses command-line flags for the application.
 // It sets the default server address to ":8080" and allows customization
@@ -13,9 +16,13 @@ var flagRunAddr string
 // The parsed value is stored in the global variable `flagRunAddr`.
 func parseFlags() {
 	flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
+	flag.StringVar(&flagLogLevel, "l", "debug", "log level")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("RUN_ADDR"); envRunAddr != "" {
 		flagRunAddr = envRunAddr
+	}
+	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
+		flagLogLevel = envLogLevel
 	}
 }
