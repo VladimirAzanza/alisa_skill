@@ -2,9 +2,11 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/VladimirAzanza/alisa_skill/internal/logger"
+	"github.com/VladimirAzanza/alisa_skill/internal/models"
 	"go.uber.org/zap"
 )
 
@@ -38,14 +40,34 @@ func webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Log.Debug("decoding request")
+	var req models.Request
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if req.Request.Type != models.TypeSimpleUtterance {
+		logger.Log.Debug("unsupported request type", zap.String("type", req.Request.Type))
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+
+	resp := models.Response{
+		Response: models.ResponsePayload{
+			Text: "Извините, я пока ничего не умею",
+		},
+		Version: "1.0",
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`
-      {
-        "response": {
-          "text": "Извините, я пока ничего не умею"
-        },
-        "version": "1.0"
-      }
-    `))
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(resp); err != nil {
+		logger.Log.Debug("error encoding response", zap.Error(err))
+		return
+	}
 	logger.Log.Debug("sending HTTP 200 response")
 }
