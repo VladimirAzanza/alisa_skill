@@ -4,11 +4,42 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/VladimirAzanza/alisa_skill/internal/logger"
 	"github.com/VladimirAzanza/alisa_skill/internal/models"
 	"go.uber.org/zap"
 )
+
+func gzipMiddleware(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ow := w
+
+		acceptEncoding := r.Header.Get("Accept-Encoding")
+		supportsGzip := strings.Contains(acceptEncoding, "gzip")
+		if supportsGzip {
+			cw := newCompressWriter(w)
+			ow = cw
+			defer cw.Close()
+
+			ow.Header().Set("Content-Encoding", "gzip")
+		}
+
+		contentEncoding := r.Header.Get("Content-Encoding")
+		sendsGzip := strings.Contains(contentEncoding, "gzip")
+		if sendsGzip {
+			cr, err := newCompressReader(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			r.Body = cr
+			defer cr.Close()
+		}
+
+		h.ServeHTTP(ow, r)
+	}
+}
 
 // go build -o skill
 // ./skill -a :8081
@@ -28,7 +59,7 @@ func run() error {
 	}
 
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
-	return http.ListenAndServe(`:8080`, http.HandlerFunc(webhook))
+	return http.ListenAndServe(`:8080`, logger.RequestLogger(gzipMiddleware(webhook)))
 }
 
 // to run this service:
