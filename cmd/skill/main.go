@@ -3,8 +3,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/VladimirAzanza/alisa_skill/internal/logger"
 	"github.com/VladimirAzanza/alisa_skill/internal/models"
@@ -65,6 +67,8 @@ func run() error {
 // to run this service:
 // curl -X POST http://localhost:8080 -H "Content-Type: application/json" -d '{}'
 func webhook(w http.ResponseWriter, r *http.Request) {
+	text := "Для вас нет новых сообщений."
+
 	if r.Method != http.MethodPost {
 		logger.Log.Debug("got request with bad method", zap.String("method", r.Method))
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -86,9 +90,23 @@ func webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Session.New {
+		tz, err := time.LoadLocation(req.Timezone)
+		if err != nil {
+			logger.Log.Debug("cannot parse timezone")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		now := time.Now().In(tz)
+		hour, minute, _ := now.Clock()
+
+		text = fmt.Sprintf("Точное время %d часов, %d минут. %s", hour, minute, text)
+	}
+
 	resp := models.Response{
 		Response: models.ResponsePayload{
-			Text: "Извините, я пока ничего не умею",
+			Text: text,
 		},
 		Version: "1.0",
 	}
