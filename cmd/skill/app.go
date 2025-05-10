@@ -67,7 +67,7 @@ func (s *app) webhook(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().In(tz)
 		hour, minute, _ := now.Clock()
 
-		text += fmt.Sprintf("Точное время %d часов, %d минут. %s", hour, minute, text)
+		text = fmt.Sprintf("Точное время %d часов, %d минут. %s", hour, minute, text)
 	}
 
 	resp := models.Response{
