@@ -2,10 +2,13 @@
 package main
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
 	"github.com/VladimirAzanza/alisa_skill/internal/logger"
+	"github.com/VladimirAzanza/alisa_skill/internal/store/pg"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
 
@@ -58,6 +61,11 @@ func run() error {
 
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
 
-	appInstance := newApp(nil)
-	return http.ListenAndServe(`:8080`, logger.RequestLogger(gzipMiddleware(appInstance.webhook)))
+	conn, err := sql.Open("pgx", flagDatabaseURI)
+	if err != nil {
+		return err
+	}
+
+	appInstance := newApp(pg.NewStore(conn))
+	return http.ListenAndServe(flagRunAddr, logger.RequestLogger(gzipMiddleware(appInstance.webhook)))
 }

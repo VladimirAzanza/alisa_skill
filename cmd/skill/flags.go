@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	flagRunAddr  string
-	flagLogLevel string
+	flagRunAddr     string
+	flagLogLevel    string
+	flagDatabaseURI string
 )
 
 // parseFlags initializes and parses command-line flags for the application.
@@ -17,6 +18,7 @@ var (
 func parseFlags() {
 	flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&flagLogLevel, "l", "debug", "log level")
+	flag.StringVar(&flagDatabaseURI, "d", "", "database URI")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("RUN_ADDR"); envRunAddr != "" {
@@ -24,5 +26,8 @@ func parseFlags() {
 	}
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
 		flagLogLevel = envLogLevel
+	}
+	if envDatabaseURI := os.Getenv("DATABASE_URI"); envDatabaseURI != "" {
+		flagDatabaseURI = envDatabaseURI
 	}
 }
