@@ -3,34 +3,48 @@ package pg
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/VladimirAzanza/alisa_skill/internal/store"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// Store реализует интерфейс store.Store и позволяет взаимодействовать с СУБД PostgreSQL
 type Store struct {
-	// Поле conn содержит объект соединения с СУБД
 	conn *sql.DB
 }
 
-// NewStore возвращает новый экземпляр PostgreSQL хранилища
 func NewStore(conn *sql.DB) *Store {
 	return &Store{conn: conn}
 }
 
-// Bootstrap подготавливает БД к работе, создавая необходимые таблицы и индексы
+func (s Store) RegisterUser(ctx context.Context, userID, username string) error {
+	_, err := s.conn.ExecContext(ctx, `
+        INSERT INTO users
+        (id, username)
+        VALUES
+        ($1, $2);
+    `, userID, username)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+			err = store.ErrConflict
+		}
+	}
+
+	return err
+}
+
 func (s Store) Bootstrap(ctx context.Context) error {
-	// запускаем транзакцию
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	// в случае неуспешного коммита все изменения транзакции будут отменены
 	defer tx.Rollback()
 
-	// создаём таблицу пользователей и необходимые индексы
 	tx.ExecContext(ctx, `
         CREATE TABLE users (
             id varchar(128) PRIMARY KEY,
@@ -39,7 +53,6 @@ func (s Store) Bootstrap(ctx context.Context) error {
     `)
 	tx.ExecContext(ctx, `CREATE UNIQUE INDEX sender_idx ON users (username)`)
 
-	// создаём таблицу сообщений и необходимые индексы
 	tx.ExecContext(ctx, `
         CREATE TABLE messages (
             id serial PRIMARY KEY,
@@ -52,19 +65,16 @@ func (s Store) Bootstrap(ctx context.Context) error {
     `)
 	tx.ExecContext(ctx, `CREATE INDEX recepient_idx ON messages (recepient)`)
 
-	// коммитим транзакцию
 	return tx.Commit()
 }
 
 func (s Store) FindRecepient(ctx context.Context, username string) (userID string, err error) {
-	// запрашиваем внутренний идентификатор пользователя по его имени
 	row := s.conn.QueryRowContext(ctx, `SELECT id FROM users WHERE username = $1`, username)
 	err = row.Scan(&userID)
 	return
 }
 
 func (s Store) ListMessages(ctx context.Context, userID string) ([]store.Message, error) {
-	// запрашиваем данные обо всех сообщениях пользователя, без самого текста
 	rows, err := s.conn.QueryContext(ctx, `
         SELECT
             m.id,
@@ -75,14 +85,12 @@ func (s Store) ListMessages(ctx context.Context, userID string) ([]store.Message
         WHERE
             m.recepient = $1
     `, userID)
-
 	if err != nil {
 		return nil, err
 	}
-	// не забываем закрыть курсор после завершения работы с данными
+
 	defer rows.Close()
 
-	// считываем записи в слайс сообщений
 	var messages []store.Message
 	for rows.Next() {
 		var m store.Message
@@ -91,8 +99,6 @@ func (s Store) ListMessages(ctx context.Context, userID string) ([]store.Message
 		}
 		messages = append(messages, m)
 	}
-
-	// необходимо проверить ошибки уровня курсора
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -101,7 +107,6 @@ func (s Store) ListMessages(ctx context.Context, userID string) ([]store.Message
 }
 
 func (s Store) GetMessage(ctx context.Context, id int64) (*store.Message, error) {
-	// запрашиваем сообщение по внутреннему идентификатору
 	row := s.conn.QueryRowContext(ctx, `
         SELECT
             m.id,
@@ -116,7 +121,6 @@ func (s Store) GetMessage(ctx context.Context, id int64) (*store.Message, error)
 		id,
 	)
 
-	// считываем значения из записи БД в соответствующие поля структуры
 	var msg store.Message
 	err := row.Scan(&msg.ID, &msg.Sender, &msg.Payload, &msg.Time)
 	if err != nil {
@@ -126,7 +130,6 @@ func (s Store) GetMessage(ctx context.Context, id int64) (*store.Message, error)
 }
 
 func (s Store) SaveMessage(ctx context.Context, userID string, msg store.Message) error {
-	// добавляем новое сообщение в БД
 	_, err := s.conn.ExecContext(ctx, `
         INSERT INTO messages
         (sender, recepient, payload, sent_at)

@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/go-resty/resty/v2 v2.16.5
+	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.2
