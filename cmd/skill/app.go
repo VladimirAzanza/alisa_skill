@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,11 +16,17 @@ import (
 )
 
 type app struct {
-	store store.Store
+	store   store.Store
+	msgChan chan store.Message
 }
 
 func newApp(s store.Store) *app {
-	return &app{store: s}
+	instance := &app{
+		store:   s,
+		msgChan: make(chan store.Message, 1024),
+	}
+	go instance.flushMessages()
+	return instance
 }
 
 func (s *app) webhook(w http.ResponseWriter, r *http.Request) {
@@ -59,16 +66,23 @@ func (s *app) webhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.store.SaveMessage(ctx, recepientID, store.Message{
-			Sender:  req.Session.User.UserID,
-			Time:    time.Now(),
-			Payload: message,
-		})
-		if err != nil {
-			logger.Log.Debug("cannot save message", zap.String("recepient", recepientID), zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		s.msgChan <- store.Message{
+			Sender:    req.Session.User.UserID,
+			Recepient: recepientID,
+			Time:      time.Now(),
+			Payload:   message,
 		}
+
+		// err = s.store.SaveMessage(ctx, recepientID, store.Message{
+		// 	Sender:  req.Session.User.UserID,
+		// 	Time:    time.Now(),
+		// 	Payload: message,
+		// })
+		// if err != nil {
+		// 	logger.Log.Debug("cannot save message", zap.String("recepient", recepientID), zap.Error(err))
+		// 	w.WriteHeader(http.StatusInternalServerError)
+		// 	return
+		// }
 
 		text = "Сообщение успешно отправлено"
 
@@ -155,4 +169,33 @@ func (s *app) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Log.Debug("sending HTTP 200 response")
+}
+
+func (a *app) flushMessages() {
+	// будем сохранять сообщения, накопленные за последние 10 секунд
+	ticker := time.NewTicker(10 * time.Second)
+
+	var messages []store.Message
+
+	for {
+		select {
+		case msg := <-a.msgChan:
+			// добавим сообщение в слайс для последующего сохранения
+			messages = append(messages, msg)
+		case <-ticker.C:
+			// подождём, пока придёт хотя бы одно сообщение
+			if len(messages) == 0 {
+				continue
+			}
+			// сохраним все пришедшие сообщения одновременно
+			err := a.store.SaveMessages(context.TODO(), messages...)
+			if err != nil {
+				logger.Log.Debug("cannot save messages", zap.Error(err))
+				// не будем стирать сообщения, попробуем отправить их чуть позже
+				continue
+			}
+			// сотрём успешно отосланные сообщения
+			messages = nil
+		}
+	}
 }

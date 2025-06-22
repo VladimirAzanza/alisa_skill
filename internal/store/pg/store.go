@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/VladimirAzanza/alisa_skill/internal/store"
@@ -136,6 +138,26 @@ func (s Store) SaveMessage(ctx context.Context, userID string, msg store.Message
         VALUES
         ($1, $2, $3, $4);
     `, msg.Sender, userID, msg.Payload, time.Now())
+
+	return err
+}
+
+func (s Store) SaveMessages(ctx context.Context, messages ...store.Message) error {
+	var values []string
+	var args []any
+	for i, msg := range messages {
+		base := i * 4
+		params := fmt.Sprintf("($%d, $%d, $%d, $%d)", base+1, base+2, base+3, base+4)
+		values = append(values, params)
+		args = append(args, msg.Sender, msg.Recepient, msg.Payload, msg.Time)
+	}
+
+	query := `
+  INSERT INTO messages
+  (sender, recepient, payload, sent_at)
+  VALUES ` + strings.Join(values, ",") + `;`
+
+	_, err := s.conn.ExecContext(ctx, query, args...)
 
 	return err
 }

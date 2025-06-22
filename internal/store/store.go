@@ -12,13 +12,14 @@ type Store interface {
 	FindRecepient(ctx context.Context, username string) (userID string, err error)
 	ListMessages(ctx context.Context, userID string) ([]Message, error)
 	GetMessage(ctx context.Context, id int64) (*Message, error)
-	SaveMessage(ctx context.Context, userID string, msg Message) error
+	SaveMessages(ctx context.Context, messages ...Message) error
 	RegisterUser(ctx context.Context, userID, username string) error
 }
 
 type Message struct {
-	ID      int64
-	Sender  string
-	Time    time.Time
-	Payload string
+	ID        int64
+	Sender    string
+	Recepient string
+	Time      time.Time
+	Payload   string
 }
